@@ -17,6 +17,7 @@ public class binExtract {
         extracted=true;
         Retro64.LOGGER.info("Extracting libsm64");
         String os = "linux";
+        String arch = "x86_64";
         String libsm64 = "libsm64.so";
         if (SystemUtils.IS_OS_WINDOWS){
             os = "windows";
@@ -25,7 +26,8 @@ public class binExtract {
             os = "macos";
             libsm64 = "libsm64.dylib";
         }
-        ResourceLocation libsm64Loc = new ResourceLocation(Retro64.MOD_ID,"binary/x86_64/"+os+"/"+libsm64);
+        if (SystemUtils.OS_ARCH.equals("aarch64") && os.equals("macos")) arch = "arm64";
+        ResourceLocation libsm64Loc = new ResourceLocation(Retro64.MOD_ID,"binary/"+arch+"/"+os+"/"+libsm64);
         Retro64.LOGGER.info("libsm64 location identified as "+libsm64Loc.toString());
         // extract into temp dir
         var tempDir = Files.createTempDirectory("retro64_bin");
