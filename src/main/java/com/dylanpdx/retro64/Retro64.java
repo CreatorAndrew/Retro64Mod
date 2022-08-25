@@ -40,7 +40,6 @@ public class Retro64
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT,Retro64Config.CONFIG_SPEC, "retro64.toml");
 
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT,()->()->{
-            Keybinds.register();
             clientEvents cEvent=new clientEvents();
             if (ModList.get().isLoaded("controllable")){
                 clientControllerEvents cControllerEvent=new clientControllerEvents();

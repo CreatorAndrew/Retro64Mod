@@ -34,17 +34,20 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelLastEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
-import net.minecraftforge.client.event.ScreenOpenEvent;
-import net.minecraftforge.client.gui.ForgeIngameGui;
-import net.minecraftforge.client.gui.IIngameOverlay;
-import net.minecraftforge.client.gui.OverlayRegistry;
+import net.minecraftforge.client.event.ScreenEvent.Opening;
+import net.minecraftforge.client.gui.overlay.IGuiOverlay;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.NetworkHooks;
 
 import java.io.IOException;
@@ -56,13 +59,27 @@ import java.util.List;
 /**
  * Handles events for the client side
  */
+@Mod.EventBusSubscriber(modid = Retro64.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class clientEvents {
-    public static final IIngameOverlay MCHAR_HP_ELEMENT= OverlayRegistry.registerOverlayTop("retro64_hearts", new SMC64HeartOverlay());
+    //public static final IIngameOverlay MCHAR_HP_ELEMENT= OverlayRegistry.registerOverlayTop("retro64_hearts", new SMC64HeartOverlay());
     //public static final IIngameOverlay MCHAR_DIALOG_ELEMENT= OverlayRegistry.registerOverlayTop("retro64_dialog", new SMC64DialogOverlay());
+
     static boolean clickDebounce=false;
     static boolean debug=false; // displays debug info
     static boolean initScreenDone =false;
 
+    @SubscribeEvent
+    public static void onKeyBindRegister(RegisterKeyMappingsEvent event)
+    {
+        Keybinds.register(event);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterOverlays(RegisterGuiOverlaysEvent event)
+    {
+        event.registerAbove(VanillaGuiOverlay.HOTBAR.id(),"retro64_hearts", new SMC64HeartOverlay());
+    }
+    
     @SubscribeEvent
     public void gameTick(TickEvent.ClientTickEvent event){
         if (event.phase== TickEvent.Phase.END)
@@ -117,15 +134,15 @@ public class clientEvents {
     @SubscribeEvent
     public void onPlayerRender(RenderPlayerEvent rpe){
 
-        if (!RemoteMCharHandler.getIsMChar(rpe.getPlayer())) // don't render if not in R64 mode
+        if (!RemoteMCharHandler.getIsMChar(rpe.getEntity())) // don't render if not in R64 mode
             return;
 
-        if (!rpe.getPlayer().isLocalPlayer())
+        if (!rpe.getEntity().isLocalPlayer())
         {
             // Render remote players (multiplayer)
             RemoteMCharHandler.tickAll(); // Tick the animation of all remote players
             mCharRenderer.renderOtherPlayer(rpe);
-            mappingsConvert.renderNameTag(rpe.getRenderer(),(AbstractClientPlayer) rpe.getPlayer(),rpe.getPlayer().getDisplayName(),rpe.getPoseStack(),rpe.getMultiBufferSource(),rpe.getPackedLight());
+            mappingsConvert.renderNameTag(rpe.getRenderer(),(AbstractClientPlayer) rpe.getEntity(),rpe.getEntity().getDisplayName(),rpe.getPoseStack(),rpe.getMultiBufferSource(),rpe.getPackedLight());
             return;
         }else{
             // Prevent player from being ticked if rendered in UI
@@ -195,21 +212,21 @@ public class clientEvents {
     }
 
     @SubscribeEvent
-    public void onRenderGameUI(RenderGameOverlayEvent.PreLayer event){
-        if (RemoteMCharHandler.getIsMChar(Minecraft.getInstance().player) && (event.getOverlay() == ForgeIngameGui.PLAYER_HEALTH_ELEMENT || event.getOverlay() == ForgeIngameGui.FOOD_LEVEL_ELEMENT || event.getOverlay() == ForgeIngameGui.ARMOR_LEVEL_ELEMENT)){
+    public void onRenderGameUI(RenderGuiOverlayEvent.Pre event){
+        if (RemoteMCharHandler.getIsMChar(Minecraft.getInstance().player) && (event.getOverlay() == VanillaGuiOverlay.PLAYER_HEALTH.type() || event.getOverlay() == VanillaGuiOverlay.FOOD_LEVEL.type() || event.getOverlay() == VanillaGuiOverlay.ARMOR_LEVEL.type())){
             event.setCanceled(true);
         }
     }
 
     @SubscribeEvent
-    public void onRenderGameUI(RenderGameOverlayEvent.Post event){
+    public void onRenderGameUI(RenderGuiOverlayEvent.Post event){
 
         if (isDebug()){
             DrawDebugUI(event);
         }
     }
 
-    private void DrawDebugUI(RenderGameOverlayEvent.Post event) {
+    private void DrawDebugUI(RenderGuiOverlayEvent.Post event) {
         var font = Minecraft.getInstance().font;
         var plr = Minecraft.getInstance().player;
         if (RemoteMCharHandler.getIsMChar(plr)){
@@ -239,12 +256,12 @@ public class clientEvents {
     public void onPlayerClone(PlayerEvent.Clone event){
         if (event.isWasDeath()) // do not carry over capabilities on death
             return;
-        RemoteMCharHandler.setIsMChar(event.getPlayer(),RemoteMCharHandler.getIsMChar(event.getOriginal()));
+        RemoteMCharHandler.setIsMChar(event.getEntity(),RemoteMCharHandler.getIsMChar(event.getOriginal()));
     }
 
 
     @SubscribeEvent
-    public void onPlayerJoinWorld(EntityJoinWorldEvent event){
+    public void onPlayerJoinWorld(EntityJoinLevelEvent event){
         if (event.getEntity() instanceof Player){
             Player plr = (Player) event.getEntity();
             if (plr.isLocalPlayer() && RemoteMCharHandler.wasMCharDimm!=null && RemoteMCharHandler.wasMCharDimm!=plr.level.dimension()){
@@ -623,7 +640,7 @@ public class clientEvents {
     }
 
     @SubscribeEvent
-    public void onScreenShown(ScreenOpenEvent event){
+    public void onScreenShown(Opening event){
         if (initScreenDone)
             return;
         var rom = SM64EnvManager.getROMFile();
@@ -636,7 +653,7 @@ public class clientEvents {
                     reason = Component.translatable("menu.retro64.warnWrongVersion");
                 else// if (!rom.exists())
                     reason = Component.translatable("menu.retro64.warnMissingROM");
-                event.setScreen(new LibLoadWarnScreen(reason));
+                event.setNewScreen(new LibLoadWarnScreen(reason));
             }else{
                 try {
                     SM64EnvManager.initLib();
